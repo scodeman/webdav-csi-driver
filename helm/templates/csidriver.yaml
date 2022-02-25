@@ -1,0 +1,6 @@
+apiVersion: {{ template "csidriver.apiVersion" . }}
+kind: CSIDriver
+metadata:
+  name: webdav.csi.scode.io
+spec:
+  attachRequired: false

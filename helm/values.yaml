@@ -1,0 +1,99 @@
+# Default values for helm.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+controllerService:
+  replicaCount: 2
+
+  nodeSelector:
+    kubernetes.io/os: linux
+
+  podSecurityContext: {}
+
+  webdavPlugin:
+    image:
+      repository: scodeman/webdav-csi-driver
+      tag: v0.0.1
+      pullPolicy: Always
+
+    extraArgs:
+      - --logtostderr
+      - --v=5
+
+    securityContext:
+      privileged: true
+      capabilities:
+        add: ["SYS_ADMIN"]
+      allowPrivilegeEscalation: true
+
+    resources: {}
+
+  csiProvisioner:
+    image:
+      repository: quay.io/k8scsi/csi-provisioner
+      tag: v1.6.0
+      pullPolicy: IfNotPresent
+
+    extraArgs:
+      - --timeout=5m
+      - --v=5
+      - --enable-leader-election
+      - --leader-election-type=leases
+
+    securityContext: {}
+
+    resources: {}
+
+nodeService:
+  podSecurityContext: {}
+
+  nodeSelector:
+    kubernetes.io/os: linux
+
+  webdavPlugin:
+    image:
+      repository: scodeman/webdav-csi-driver
+      tag: v0.0.1
+      pullPolicy: Always
+
+    extraArgs:
+      - --logtostderr
+      - --v=5
+
+    securityContext:
+      privileged: true
+
+    resources: {}
+
+  csiDriverRegistrar:
+    image:
+      repository: quay.io/k8scsi/csi-node-driver-registrar
+      tag: v1.1.0
+      pullPolicy: IfNotPresent
+
+    extraArgs:
+      - --v=5
+
+    securityContext: {}
+
+    resources: {}
+
+  livenessProbe:
+    image:
+      repository: quay.io/k8scsi/livenessprobe
+      tag: v1.1.0
+      pullPolicy: IfNotPresent
+
+    resources: {}
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  annotations: {}
+  name: webdav-csi-controller-sa
+
+globalConfig:
+  secret: {}

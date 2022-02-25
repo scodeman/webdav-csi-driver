@@ -1,0 +1,15 @@
+apiVersion: v2
+appVersion: "0.0.1"
+name: wedvav-csi-driver
+description: A Helm chart for Webdav CSI Driver
+version: 0.0.1
+kubeVersion: ">=1.14.0-0"
+home: https://github.com/scodeman/webdav-csi-driver
+sources:
+  - https://github.com/scodeman/webdav-csi-driver
+keywords:
+  - webdav
+  - scodeman
+  - csi
+maintainers:
+  - name: "Scodeman"

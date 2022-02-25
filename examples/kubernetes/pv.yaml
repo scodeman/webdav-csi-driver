@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: webdav-pv
+spec:
+  capacity:
+    storage: 5Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: webdav-sc
+  csi:
+    driver: webdav.csi.scode.io
+    volumeHandle: webdav-vol-id
+    volumeAttributes:
+      client: "webdav"
+      url: "https://webdavserver.io"
+      user: "iychoi"
+      password: "yourpassword"

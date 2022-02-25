@@ -1,0 +1,140 @@
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: {{ include "helm.fullname" . }}-node
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "helm.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "helm.selectorLabels" . | nindent 6 }}-node
+  template:
+    metadata:
+      labels:
+        {{- include "helm.selectorLabels" . | nindent 8 }}-node
+    spec:
+      securityContext:
+        {{- toYaml .Values.nodeService.podSecurityContext | nindent 8 }}
+      hostNetwork: true
+      priorityClassName: system-node-critical
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: webdav-plugin
+          securityContext:
+            {{- toYaml .Values.nodeService.webdavPlugin.securityContext | nindent 12 }}
+          image: "{{ .Values.nodeService.webdavPlugin.image.repository }}:{{ .Values.nodeService.webdavPlugin.image.tag }}"
+          imagePullPolicy: {{ .Values.nodeService.webdavPlugin.image.pullPolicy }}
+          args:
+            - --endpoint=$(CSI_ENDPOINT)
+            - --nodeid=$(NODE_ID)
+            - --secretpath=$(SECRET_VOLUME_PATH)
+            {{- toYaml .Values.nodeService.webdavPlugin.extraArgs | nindent 12 }}
+          env:
+            - name: CSI_ENDPOINT
+              value: unix:/csi/csi.sock
+            - name: SECRET_VOLUME_PATH
+              value: /secrets
+            - name: NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: mountpoint-dir
+              mountPath: /var/lib/kubelet/pods
+              mountPropagation: Bidirectional
+            - name: plugin-dir
+              mountPath: /var/lib/kubelet/plugins
+              mountPropagation: Bidirectional
+            - name: socket-dir
+              mountPath: /csi
+            - name: secret-volume
+              mountPath: /secrets
+          ports:
+            - containerPort: 9810
+              name: healthz
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: healthz
+            initialDelaySeconds: 10
+            timeoutSeconds: 3
+            periodSeconds: 2
+            failureThreshold: 5
+          resources:
+            {{- toYaml .Values.nodeService.webdavPlugin.resources | nindent 12 }}
+        - name: webdav-pool
+          securityContext:
+            {{- toYaml .Values.nodeService.webdavPool.securityContext | nindent 12 }}
+          image: "{{ .Values.nodeService.webdavPool.image.repository }}:{{ .Values.nodeService.webdavPool.image.tag }}"
+          imagePullPolicy: {{ .Values.nodeService.webdavPool.image.pullPolicy }}
+          args:
+            {{- toYaml .Values.nodeService.webdavPool.extraArgs | nindent 12 }}
+          ports:
+            - containerPort: 12020
+              name: pool-grpc
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.nodeService.webdavPool.resources | nindent 12 }}
+        - name: csi-driver-registrar
+          securityContext:
+            {{- toYaml .Values.nodeService.csiDriverRegistrar.securityContext | nindent 12 }}
+          image: "{{ .Values.nodeService.csiDriverRegistrar.image.repository }}:{{ .Values.nodeService.csiDriverRegistrar.image.tag }}"
+          imagePullPolicy: {{ .Values.nodeService.csiDriverRegistrar.image.pullPolicy }}
+          args:
+            - --csi-address=$(ADDRESS)
+            - --kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)
+            {{- toYaml .Values.nodeService.csiDriverRegistrar.extraArgs | nindent 12 }}
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+            - name: DRIVER_REG_SOCK_PATH
+              value: /var/lib/kubelet/plugins/webdav.csi.scode.io/csi.sock
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+            - name: registration-dir
+              mountPath: /registration
+          resources:
+            {{- toYaml .Values.nodeService.csiDriverRegistrar.resources | nindent 12 }}
+        - name: liveness-probe
+          imagePullPolicy: {{ .Values.nodeService.livenessProbe.image.pullPolicy }}
+          image: "{{ .Values.nodeService.livenessProbe.image.repository }}:{{ .Values.nodeService.livenessProbe.image.tag }}"
+          args:
+            - --csi-address=/csi/csi.sock
+            - --health-port=9810
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+          resources:
+            {{- toYaml .Values.nodeService.livenessProbe.resources | nindent 12 }}
+      volumes:
+        - name: mountpoint-dir
+          hostPath:
+            path: /var/lib/kubelet/pods
+            type: DirectoryOrCreate
+        - name: plugin-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins
+            type: Directory
+        - name: registration-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins_registry
+            type: Directory
+        - name: socket-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins/webdav.csi.scode.io
+            type: DirectoryOrCreate
+        - name: secret-volume
+          secret:
+            secretName: {{ include "helm.fullname" . }}-global-secret
+      {{- with .Values.nodeService.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
